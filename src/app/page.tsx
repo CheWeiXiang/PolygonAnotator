@@ -18,6 +18,7 @@ import {
   ImageIcon,
   Square,
   Move,
+  Download,
 } from "lucide-react";
 
 type Point = { x: number; y: number };
@@ -70,7 +71,7 @@ export default function PolygonAnnotator() {
     setSelectedIndices(new Set());
   };
 
-  const getImageCoords = (e: React.MouseEvent<HTMLElement>) => {
+  const getImageCoords = (e: React.MouseEvent<Element>) => {
     const container = containerRef.current;
     if (!container) return null;
     const img = container.querySelector("img");
@@ -121,6 +122,11 @@ export default function PolygonAnnotator() {
   };
 
   const handleShapeClick = (e: React.MouseEvent, index: number) => {
+    // Alt key bypasses selection to allow adding points through shapes
+    if (e.altKey) {
+      return; // Let the click pass through to handleImageClick
+    }
+    
     e.stopPropagation();
 
     if (e.ctrlKey || e.metaKey) {
@@ -143,13 +149,18 @@ export default function PolygonAnnotator() {
     }
   };
 
-  const handleShapeMouseDown = (e: React.MouseEvent<SVGGElement>, index: number) => {
+  const handleShapeMouseDown = (e: React.MouseEvent, index: number) => {
+    // Alt key bypasses selection to allow adding points through shapes
+    if (e.altKey) {
+      return;
+    }
+    
     if (!selectedIndices.has(index) && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
       setSelectedIndices(new Set([index]));
     }
 
     if (selectedIndices.has(index) || (!e.ctrlKey && !e.metaKey && !e.shiftKey)) {
-      const coords = getImageCoords(e as unknown as React.MouseEvent<HTMLElement>);
+      const coords = getImageCoords(e);
       if (coords) {
         setIsDraggingShapes(true);
         setDragStart(coords);
@@ -286,6 +297,33 @@ export default function PolygonAnnotator() {
     navigator.clipboard.writeText(output);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const exportSVG = () => {
+    if (shapes.length === 0 || size.w === 0 || size.h === 0) return;
+
+    const shapesContent = shapes
+      .filter((s) => s.points.length > 0)
+      .map((shape, i) => {
+        const points = shape.points.map((p) => `${p.x},${p.y}`).join(" ");
+        return `<g id="${customName}-${start + i}">\n  <polygon fill="#00ff00" points="${points}" />\n</g>`;
+      })
+      .join("\n\n");
+
+    const svgContent = `<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 ${size.w} ${size.h}" style="enable-background:new 0 0 ${size.w} ${size.h};" xml:space="preserve">
+${shapesContent}
+</svg>`;
+
+    const blob = new Blob([svgContent], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${customName}-annotations.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Track Alt key state for bypassing shape selection
@@ -747,7 +785,7 @@ export default function PolygonAnnotator() {
                 <span>
                   Image size: {size.w} × {size.h}px
                 </span>
-                <span>{rectMode ? "Click two corners to draw rectangle" : "Click to add points"}</span>
+                <span>{rectMode ? "Click two corners to draw rectangle" : "Click to add points"} | Hold Alt to click through shapes</span>
               </div>
             </div>
 
@@ -839,25 +877,37 @@ export default function PolygonAnnotator() {
                 <CardContent className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium text-foreground">SVG Output</h3>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={copyToClipboard}
-                      disabled={completedShapes === 0}
-                      className="gap-2"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-4 h-4 text-accent" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          Copy
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={exportSVG}
+                        disabled={completedShapes === 0}
+                        className="gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        Export
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyToClipboard}
+                        disabled={completedShapes === 0}
+                        className="gap-2"
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="w-4 h-4 text-accent" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            Copy
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="relative">
