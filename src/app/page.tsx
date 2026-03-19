@@ -288,7 +288,7 @@ export default function PolygonAnnotator() {
                           h: img.naturalHeight,
                         });
                       }}
-                      className="relative max-w-full w-full h-auto block cursor-crosshair"
+                      className="relative max-w-full w-full h-auto block cursor-crosshair bg-white"
                       alt="Annotate this image"
                     />
 
